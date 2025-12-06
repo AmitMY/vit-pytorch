@@ -290,8 +290,11 @@ class NaViT(nn.Module):
                 assert all([divisible_by(dim, p) for dim in image_dims]), f'height and width {image_dims} of images must be divisible by patch size {p}'
                 patch_dims.append((image_dims[0] // p, image_dims[1] // p))
 
-            # extract patches for all images
-            sequences = [rearrange(img, 'c (h p1) (w p2) -> (h w) (c p1 p2)', p1=p, p2=p) for img in images]
+            # extract patches for all images using view + permute (faster than einops rearrange)
+            sequences = []
+            for img, (ph, pw) in zip(images, patch_dims):
+                patches = img.view(c, ph, p, pw, p).permute(1, 3, 0, 2, 4).reshape(ph * pw, c * p * p)
+                sequences.append(patches)
 
             # compute positions using repeat_interleave (faster than meshgrid per image)
             positions = []
